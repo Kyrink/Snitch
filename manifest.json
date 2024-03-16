@@ -1,0 +1,24 @@
+{
+    "manifest_version": 3,
+    "name": "Snitch Privacy Extension",
+    "version": "1.0",
+    "description": "Helps protect your privacy online by alerting you to tracking scripts and offering privacy advice.",
+    "icons": {
+        "48": "public/snitch.png",
+        "128": "public/snitch.png"
+    },
+    "action": {
+        "default_popup": "dist/src/Popup.html",
+        "default_icon": {
+            "48": "public/snitch.png",
+            "128": "public/snitch.png"
+        }
+    },
+    "permissions": [
+        "activeTab",
+        "storage"
+    ],
+    "content_security_policy": {
+        "extension_pages": "script-src 'self'; object-src 'self'"
+    }
+}
