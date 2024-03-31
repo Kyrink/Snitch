@@ -14,8 +14,10 @@ const storage = new Storage();
 const bucketName = 'snitch-domain-data';
 
 async function getJsonFiles() {
+    console.log('Retrieving JSON files from bucket...');
     const bucket = storage.bucket(bucketName);
     const [files] = await bucket.getFiles();
+    console.log(`Found ${files.length} files. Processing...`);
     const batchSize = 2000; // Adjust batch size as needed
     const jsonFilePromises = [];
 
@@ -33,19 +35,34 @@ async function getJsonFiles() {
                 });
             }
         });
-        // Wait for the current batch to finish before starting the next one
+        console.log(`Processing batch ${i / batchSize + 1} of ${Math.ceil(files.length / batchSize)}`);
         const batchResults = await Promise.all(batch);
         jsonFilePromises.push(...batchResults.filter(Boolean));
     }
 
+    console.log('All files processed.');
     return jsonFilePromises;
 }
 
 
 // Formats the JSON data into the structure you want in Firestore
 function formatDataForFirestore(jsonData) {
-    // Adapt this function to transform your JSON data into the desired Firestore format.
-    // This is a simplistic transformation and should be replaced with your specific needs.
+    // Example of trimming long string fields
+    const trimmedSubdomains = jsonData.subdomains?.length > 100 ? jsonData.subdomains.slice(0, 100) : jsonData.subdomains;
+
+    // Example of limiting array lengths
+    const topInitiators = jsonData.topInitiators?.slice(0, 10).map(initiator => ({
+        domain: initiator.domain,
+        prevalence: initiator.prevalence
+    })) ?? [];
+
+    const resources = jsonData.resources?.slice(0, 50).map(resource => ({
+        rule: resource.rule,
+        type: resource.type,
+        prevalence: resource.prevalence,
+        fingerprinting: resource.fingerprinting
+    })) ?? [];
+
     return {
         domain: jsonData.domain,
         prevalence: jsonData.prevalence,
@@ -53,42 +70,46 @@ function formatDataForFirestore(jsonData) {
         cookies: jsonData.cookies,
         resourceTypes: jsonData.types,
         categories: jsonData.categories || [],
-        subdomains: jsonData.subdomains,
+        subdomains: trimmedSubdomains,
         nameservers: jsonData.nameservers,
-        topInitiators: jsonData.topInitiators.map(initiator => ({
-            domain: initiator.domain,
-            prevalence: initiator.prevalence
-        })),
-        resources: jsonData.resources.map(resource => ({
-            rule: resource.rule,
-            type: resource.type,
-            prevalence: resource.prevalence,
-            fingerprinting: resource.fingerprinting
-        }))
-        // Add other fields as needed...
+        topInitiators: topInitiators,
+        resources: resources
     };
 }
 
+
+
 // Uploads the formatted data to Firestore
 async function uploadDataToFirestore(formattedData) {
-    const trackersCollectionRef = db.collection('trackers');
+    console.log('Uploading data to Firestore...');
+    const trackersCollectionRef = db.collection('Trackers');
+    let count = 0;
 
     for (const [domain, trackerData] of Object.entries(formattedData)) {
         await trackersCollectionRef.doc(domain).set(trackerData);
+        count++;
     }
+
+    console.log(`Uploaded ${count} documents to Firestore.`);
 }
 
 async function aggregateData() {
+    console.log('Starting data aggregation...');
     const jsonFiles = await getJsonFiles();
     const formattedData = {};
 
+    console.log('Formatting data for Firestore...');
     for (const jsonData of jsonFiles) {
-        formattedData[jsonData.domain] = formatDataForFirestore(jsonData);
+        if (jsonData.domain) { // Ensuring jsonData has a domain property before proceeding
+            formattedData[jsonData.domain] = formatDataForFirestore(jsonData);
+        }
     }
 
+    console.log('Data formatted. Beginning upload to Firestore...');
     await uploadDataToFirestore(formattedData);
+    console.log('Data aggregation complete.');
 }
 
 aggregateData()
-    .then(() => console.log('Data aggregation complete.'))
+    .then(() => console.log('Script completed successfully.'))
     .catch(error => console.error('An error occurred:', error));

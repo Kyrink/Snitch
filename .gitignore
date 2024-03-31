@@ -13,6 +13,7 @@ dist-ssr
 *.local
 snitch1-4c4b87041f8e.json
 snitch1-b3eff3a32d29.json
+firebaseConfig.js
 
 # Editor directories and files
 .vscode/*

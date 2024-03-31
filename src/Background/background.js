@@ -1,31 +1,89 @@
-// background.js
+import { db } from '../../firebaseConfig';
+import { collection, getDocs } from 'firebase/firestore';
 
-// A simple structure to hold detected tracking requests
+
+let knownTrackers = {};
+
+
+async function fetchKnownTrackers() {
+    const trackersCollectionRef = collection(db, 'Trackers');
+    const snapshot = await getDocs(trackersCollectionRef);
+
+    snapshot.docs.forEach((docSnapshot) => {
+        const data = docSnapshot.data();
+        knownTrackers[data.domain] = {
+            prevalence: data.prevalence,
+            fingerprinting: data.fingerprinting,
+            cookies: data.cookies,
+            resourceTypes: data.resourceTypes, // Assuming this is an object
+            categories: data.categories, // Assuming this is an array
+            topInitiators: (data.topInitiators || []).map(initiator => ({
+                domain: initiator.domain,
+                prevalence: initiator.prevalence
+            })),
+            // Add other fields as needed
+        };
+    });
+
+    console.log('Known trackers updated.');
+}
+
+fetchKnownTrackers();
+
+// hold detected tracking requests
 let privacyReport = {
     dataUsage: '',
     trackingTechniques: [],
     collectors: [],
 };
 
-// You might use a more complex system with databases or lists to check if a URL is a known tracker
-function isTracker(url) {
-    // This function should contain logic to determine if the URL is a known tracker
-    // For example, you could check against a list of known tracker patterns
-    return false; // Replace with actual checking logic
+async function isTracker(url) {
+    const urlObj = new URL(url);
+    const domain = urlObj.hostname.replace('www.', ''); // Normalizing the domain
+
+    // Construct the document reference from the 'Trackers' collection
+    const trackerDocRef = doc(db, 'Trackers', domain);
+
+    try {
+        const trackerDocSnap = await getDoc(trackerDocRef);
+        if (trackerDocSnap.exists()) {
+            console.log(`Tracker found: ${domain}`);
+            // Convert the document into a usable JavaScript object
+            const trackerData = trackerDocSnap.data();
+            return {
+                prevalence: trackerData.prevalence,
+                fingerprinting: trackerData.fingerprinting,
+                // ... and other fields you need
+            };
+        }
+    } catch (error) {
+        console.error("Error querying Firestore for domain:", domain, error);
+    }
+    return false;
 }
 
-// Listen to web requests and analyze them
 chrome.webRequest.onBeforeRequest.addListener(
-    (details) => {
-        if (isTracker(details.url)) {
-            // If the URL is identified as a tracking script
-            privacyReport.trackingTechniques.push(details.url);
-            // ... more logic to update `dataUsage` and `collectors`
+    async (details) => {
+        try {
+            const url = new URL(details.url);
+            const domain = url.hostname;
+            const trackerInfo = await isTracker(domain);
+
+            if (trackerInfo) {
+                privacyReport.trackingTechniques.push({
+                    url: details.url,
+                    domain: domain,
+                    ...trackerInfo, // Adjust according to how you plan to structure trackerInfo
+                });
+            }
+        } catch (error) {
+            console.error("Error processing URL:", error.message);
         }
     },
-    { urls: ["<all_urls>"] }, // Listen to all URLs
-    ["blocking"]
+    { urls: ["<all_urls>"] }
 );
+
+
 
 // Listen for messages from the popup script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {

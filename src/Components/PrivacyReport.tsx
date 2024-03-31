@@ -12,10 +12,18 @@ const PrivacyReport: React.FC = () => {
             <ul className="list-disc list-inside">
                 <li className="mb-2">Data Usage: {privacyReport.dataUsage}</li>
                 <li className="mb-2">Tracking Techniques:</li>
-                {privacyReport.trackingTechniques.map((technique, index) => (
-                    <li key={index} className="ml-4">{technique}</li>
+                {privacyReport.trackingTechniques.map((tracker, index) => (
+                    <li key={index} className="ml-4">
+                        Domain: {tracker.domain}, Prevalence: {tracker.prevalence}, Fingerprinting: {tracker.fingerprinting ? 'Yes' : 'No'}, Cookies: {tracker.cookies ? 'Yes' : 'No'}
+                        <br />
+                        Resource Types: {tracker.resourceTypes.join(', ')}
+                        <br />
+                        Categories: {tracker.categories.join(', ')}
+                        <br />
+                        Top Initiators: {tracker.topInitiators.join(', ')}
+                    </li>
                 ))}
-                {/* Similar mapping for collectors */}
+                {/* Similar mapping for collectors if needed */}
             </ul>
         </div>
     );

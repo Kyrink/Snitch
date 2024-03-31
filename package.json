@@ -2,16 +2,17 @@
   "name": "snitch",
   "private": true,
   "version": "0.0.0",
-  "type": "commonjs",
+  "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && cp manifest.json dist/manifest.json",
+    "build": "tsc && vite build && cp manifest.json dist/manifest.json && mkdir -p dist/rules && cp ruleset_1.json dist/rules/ruleset_1.json && node src/Background/fixManifest.cjs",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.8.0",
     "dotenv": "^16.4.5",
+    "firebase": "^10.9.0",
     "firebase-admin": "^12.0.0",
     "node-fetch": "^3.3.2",
     "react": "^18.2.0",

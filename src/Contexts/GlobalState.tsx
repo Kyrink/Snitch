@@ -5,6 +5,17 @@ interface StateContextType {
     dispatch: React.Dispatch<ActionType>;
 }
 
+interface TrackerInfo {
+    url: string;
+    domain: string;
+    prevalence: string; // Or number, if prevalence is a percentage
+    fingerprinting: boolean;
+    cookies: boolean;
+    resourceTypes: string[];
+    categories: string[];
+    topInitiators: string[];
+}
+
 interface StateType {
     privacyScore: number | null;
     privacyAlerts: string[];
@@ -14,18 +25,21 @@ interface StateType {
         blockCookies: boolean;
     };
     privacyReport: {
-        trackingTechniques: string[];
+        trackingTechniques: TrackerInfo[]; // Updated to use TrackerInfo[]
         dataUsage: string;
         collectors: string[];
     };
 }
+
 
 type ActionType =
     | { type: 'SET_PRIVACY_SCORE'; payload: number }
     | { type: 'ADD_PRIVACY_ALERT'; payload: string }
     | { type: 'SET_PRIVACY_TIPS'; payload: string[] }
     | { type: 'UPDATE_SETTINGS'; payload: { blockTrackers?: boolean; blockCookies?: boolean } }
-    | { type: 'REMOVE_PRIVACY_ALERT'; payload: number };
+    | { type: 'REMOVE_PRIVACY_ALERT'; payload: number }
+    | { type: 'ADD_TRACKING_TECHNIQUE'; payload: TrackerInfo } // New action type
+    | { type: 'RESET_PRIVACY_REPORT' }; // New action type to reset the report
 
 
 const initialState: StateType = {
