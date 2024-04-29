@@ -15,13 +15,16 @@
         }
     },
     "background": {
-        "service_worker": "assets/background-uOzE8FEm.js"
+        "service_worker": "src/Background/background.js"
     },
     "permissions": [
         "activeTab",
         "declarativeNetRequest",
         "storage",
-        "webRequest"
+        "webRequest",
+        "<all_urls>",
+        "http://*/*",
+        "https://*/*"
     ],
     "host_permissions": [
         "<all_urls>"

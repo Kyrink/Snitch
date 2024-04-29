@@ -5,15 +5,13 @@ interface StateContextType {
     dispatch: React.Dispatch<ActionType>;
 }
 
-interface TrackerInfo {
-    url: string;
-    domain: string;
-    prevalence: string; // Or number, if prevalence is a percentage
-    fingerprinting: boolean;
-    cookies: boolean;
-    resourceTypes: string[];
-    categories: string[];
-    topInitiators: string[];
+// Refactored to include new data structure
+export interface SiteSafetyInfo {
+    safetyStatus: string;
+    safetyConfidence: number;
+    childSafetyConfidence: number;
+    reputations: number[];
+    categories: { name: string; confidence: number }[];
 }
 
 interface StateType {
@@ -24,13 +22,8 @@ interface StateType {
         blockTrackers: boolean;
         blockCookies: boolean;
     };
-    privacyReport: {
-        trackingTechniques: TrackerInfo[]; // Updated to use TrackerInfo[]
-        dataUsage: string;
-        collectors: string[];
-    };
+    privacyReport: SiteSafetyInfo; // Updated to use SiteSafetyInfo
 }
-
 
 type ActionType =
     | { type: 'SET_PRIVACY_SCORE'; payload: number }
@@ -38,9 +31,8 @@ type ActionType =
     | { type: 'SET_PRIVACY_TIPS'; payload: string[] }
     | { type: 'UPDATE_SETTINGS'; payload: { blockTrackers?: boolean; blockCookies?: boolean } }
     | { type: 'REMOVE_PRIVACY_ALERT'; payload: number }
-    | { type: 'ADD_TRACKING_TECHNIQUE'; payload: TrackerInfo } // New action type
-    | { type: 'RESET_PRIVACY_REPORT' }; // New action type to reset the report
-
+    | { type: 'UPDATE_PRIVACY_REPORT'; payload: SiteSafetyInfo } // Updated action type to handle new structure
+    | { type: 'RESET_PRIVACY_REPORT' };
 
 const initialState: StateType = {
     privacyScore: null,
@@ -51,30 +43,31 @@ const initialState: StateType = {
         blockCookies: true,
     },
     privacyReport: {
-        trackingTechniques: [],
-        dataUsage: '',
-        collectors: []
+        safetyStatus: '',
+        safetyConfidence: 0,
+        childSafetyConfidence: 0,
+        reputations: [],
+        categories: []
     }
 };
 
 const StateContext = createContext<StateContextType | undefined>(undefined);
 
 const reducer = (state: StateType, action: ActionType): StateType => {
+    // Inside your reducer function
     switch (action.type) {
         case 'SET_PRIVACY_SCORE':
             return { ...state, privacyScore: action.payload };
-        case 'ADD_PRIVACY_ALERT':
-            return { ...state, privacyAlerts: [...state.privacyAlerts, action.payload] };
-        case 'SET_PRIVACY_TIPS':
-            return { ...state, privacyTips: action.payload };
-        case 'UPDATE_SETTINGS':
-            return { ...state, settings: { ...state.settings, ...action.payload } };
-        case 'REMOVE_PRIVACY_ALERT':
-            const updatedAlerts = state.privacyAlerts.filter((_, index) => index !== action.payload);
-            return { ...state, privacyAlerts: updatedAlerts };
+        // ... handle the other action types similarly
+        // Existing case handlers
+        case 'UPDATE_PRIVACY_REPORT':
+            return { ...state, privacyReport: action.payload };
+        case 'RESET_PRIVACY_REPORT':
+            return { ...state, privacyReport: initialState.privacyReport };
         default:
             return state;
     }
+
 };
 
 export const GlobalState: React.FC<{ children: ReactNode }> = ({ children }) => {

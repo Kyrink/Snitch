@@ -1,112 +1,64 @@
-import { db } from '../../firebaseConfig';
-import { collection, getDocs } from 'firebase/firestore';
+const userId = '8986619'; // Replace with your actual WOT User ID
+const apiKey = '814448b67590c365aee1302e68b7fbf52588b1eb';
 
+console.log('Background script has been loaded.');
 
-let knownTrackers = {};
-
-
-async function fetchKnownTrackers() {
-    const trackersCollectionRef = collection(db, 'Trackers');
-    const snapshot = await getDocs(trackersCollectionRef);
-
-    snapshot.docs.forEach((docSnapshot) => {
-        const data = docSnapshot.data();
-        knownTrackers[data.domain] = {
-            prevalence: data.prevalence,
-            fingerprinting: data.fingerprinting,
-            cookies: data.cookies,
-            resourceTypes: data.resourceTypes, // Assuming this is an object
-            categories: data.categories, // Assuming this is an array
-            topInitiators: (data.topInitiators || []).map(initiator => ({
-                domain: initiator.domain,
-                prevalence: initiator.prevalence
-            })),
-            // Add other fields as needed
-        };
-    });
-
-    console.log('Known trackers updated.');
-}
-
-fetchKnownTrackers();
-
-// hold detected tracking requests
-let privacyReport = {
-    dataUsage: '',
-    trackingTechniques: [],
-    collectors: [],
-};
-
-async function isTracker(url) {
-    const urlObj = new URL(url);
-    const domain = urlObj.hostname.replace('www.', ''); // Normalizing the domain
-
-    // Construct the document reference from the 'Trackers' collection
-    const trackerDocRef = doc(db, 'Trackers', domain);
-
-    try {
-        const trackerDocSnap = await getDoc(trackerDocRef);
-        if (trackerDocSnap.exists()) {
-            console.log(`Tracker found: ${domain}`);
-            // Convert the document into a usable JavaScript object
-            const trackerData = trackerDocSnap.data();
-            return {
-                prevalence: trackerData.prevalence,
-                fingerprinting: trackerData.fingerprinting,
-                // ... and other fields you need
-            };
+function fetchAndProcessData(urlToCheck) {
+    fetch(`https://scorecard.api.mywot.com/v3/targets?t=${urlToCheck}`, {
+        method: 'GET',
+        headers: {
+            'x-user-id': userId,
+            'x-api-key': apiKey
         }
-    } catch (error) {
-        console.error("Error querying Firestore for domain:", domain, error);
-    }
-    return false;
-}
-
-chrome.webRequest.onBeforeRequest.addListener(
-    async (details) => {
-        try {
-            const url = new URL(details.url);
-            const domain = url.hostname;
-            const trackerInfo = await isTracker(domain);
-
-            if (trackerInfo) {
-                privacyReport.trackingTechniques.push({
-                    url: details.url,
-                    domain: domain,
-                    ...trackerInfo, // Adjust according to how you plan to structure trackerInfo
-                });
+    })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
-        } catch (error) {
-            console.error("Error processing URL:", error.message);
-        }
-    },
-    { urls: ["<all_urls>"] }
-);
+            return response.json();
+        })
+        .then(data => {
+            const processedData = data.map(siteData => ({
+                target: siteData.target,
+                safetyStatus: siteData.safety?.status,
+                safetyReputation: siteData.safety?.reputation,
+                safetyConfidence: siteData.safety?.confidence,
+                childSafetyReputation: siteData.childSafety?.reputation,
+                childSafetyConfidence: siteData.childSafety?.confidence,
+                categories: siteData.categories?.map(category => ({
+                    id: category.id,
+                    name: category.name,
+                    confidence: category.confidence
+                })) || [],
+                blackList: siteData.blackList || []
+            }));
 
+            // Store the processed data in local storage
+            chrome.storage.local.set({ [urlToCheck]: processedData }, () => {
+                console.log(`Data stored for ${urlToCheck}`);
+            });
+            // Send the processed data to the popup or content script
+            chrome.runtime.sendMessage({ action: "UPDATE_PRIVACY_REPORT", data: processedData });
+        })
+        .catch(error => {
+            console.error('WOT API Error:', error);
+        });
+}
 
-
-// Listen for messages from the popup script
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.message === "getPrivacyReport") {
-        sendResponse(privacyReport);
-    } else if (request.message === "resetPrivacyReport") {
-        // Reset the report, for example, when the user navigates to a new page
-        privacyReport = {
-            dataUsage: '',
-            trackingTechniques: [],
-            collectors: [],
-        };
-        sendResponse({ status: 'Privacy report reset' });
-    }
-});
-
-// Reset privacy report when a new page is loaded
+// Listener for tab updates
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-    if (changeInfo.status === 'complete' && tab.active) {
-        privacyReport = {
-            dataUsage: '',
-            trackingTechniques: [],
-            collectors: [],
-        };
+    // Check that the tab's URL is valid and is not an internal chrome page
+    if (changeInfo.status === 'complete' && tab.active && tab.url && /^(https?:\/\/)/.test(tab.url)) {
+        const urlToCheck = new URL(tab.url).hostname;
+        fetchAndProcessData(urlToCheck);
     }
 });
+
+// Listener for the active tab when the extension is first loaded
+chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs[0] && tabs[0].url && /^(https?:\/\/)/.test(tabs[0].url)) {
+        const urlToCheck = new URL(tabs[0].url).hostname;
+        fetchAndProcessData(urlToCheck);
+    }
+});
+

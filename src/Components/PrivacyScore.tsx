@@ -16,7 +16,7 @@ const PrivacyScore: React.FC = () => {
 
     return (
         <div className="flex items-center mb-4">
-            <span className="text-lg font-semibold">Privacy Score:</span>
+            <span className="text-lg font-semibold">Privacy Status:</span>
             <span className={`ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${scoreClass}`}>
                 {displayScore}
             </span>
